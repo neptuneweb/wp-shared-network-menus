@@ -79,14 +79,14 @@ class NetworkSharedMenus {
     /** Handy Logging function. */
     private function log($message){
     	if( WP_DEBUG ){
-    		error_log( $this->class_name . ' :: ' . $message );
+    		error_log( self::$class_name . ' :: ' . $message );
     	}
     }
 
     public function filter_nav_items( $content, $args ){
     	// Apply Filter to gather up additional Menu Locations to share
 		$this->network_menu_slots = apply_filters( 'network_shared_menus_theme_locations', $this->network_menu_slots );
-		$this->log('Slots: '.print_r($network_menu_slots,true));
+		$this->log('Slots: '.print_r($this->network_menu_slots,true));
 
 		if( count( $this->network_menu_slots ) > 0 ){
 			if( ! is_main_site() ){
@@ -151,12 +151,12 @@ class NetworkSharedMenus {
 					$save_network_menus[] = $a_theme_location;
 				}
 			}
-			update_option( 'network_shared_menus', $save_network_menus );
+			update_site_option( 'network_shared_menus', $save_network_menus );
 			foreach( $save_network_menus as $a_slot ){
 				update_option( 'network_shared_menu_'.$a_slot.'_cached', '' );	
 			}	
 		}
-		$current_network_menus = get_option('network_shared_menus', array());
+		$current_network_menus = get_site_option('network_shared_menus', array());
 		?>
 		<div class="wrap">
 			<h2>
@@ -183,7 +183,7 @@ class NetworkSharedMenus {
 
     /** Hooks into the filter to specify the menu locations to share */
     public function fetch_menu_slots( $slots ){
-    	$current_network_menus = get_option('network_shared_menus', array());
+    	$current_network_menus = get_site_option('network_shared_menus', array());
 		if( count($current_network_menus) > 0 ){
 			$slots = array_merge($slots, $current_network_menus);
 		}
