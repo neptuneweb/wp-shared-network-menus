@@ -55,14 +55,19 @@ class NetworkSharedMenus {
     }
 
     public function __construct(){
+    	$current_integration_type = get_site_option( 'network_shared_menus_type', 'html' );
     	/**
     	 * Hook the Filter for the Nav Menu Items
     	 */
-		add_filter( 'wp_nav_menu_objects',         array( &$this, 'filter_nav_items' ), 10, 2 );
+    	if( $current_integration_type == 'object'){
+    		add_filter( 'wp_nav_menu_objects',         array( &$this, 'filter_nav_items' ), 10, 2 );	
+    	} else {
+    		add_filter( 'wp_nav_menu',         array( &$this, 'filter_nav_items' ), 10, 2 );	
+    	}		
 		/**
 		 * Hook the Filter for gathering the Menu Locations to share
 		 */
-		add_filter(	'network_shared_menus_theme_locations', array( &$this, 'fetch_menu_slots' ), 10 ,1 );
+		add_filter(	'ra_wp_nav_menu_filter_slots', array( &$this, 'fetch_menu_slots' ), 10 ,1 );
 
 		if( is_main_site() ){
 			/**
@@ -76,7 +81,6 @@ class NetworkSharedMenus {
 		}
     }
 
-    /** Handy Logging function. */
     private function log($message){
     	if( WP_DEBUG ){
     		error_log( self::$class_name . ' :: ' . $message );
@@ -85,7 +89,7 @@ class NetworkSharedMenus {
 
     public function filter_nav_items( $content, $args ){
     	// Apply Filter to gather up additional Menu Locations to share
-		$this->network_menu_slots = apply_filters( 'network_shared_menus_theme_locations', $this->network_menu_slots );
+		$this->network_menu_slots = apply_filters( 'ra_wp_nav_menu_filter_slots', $this->network_menu_slots );
 		$this->log('Slots: '.print_r($this->network_menu_slots,true));
 
 		if( count( $this->network_menu_slots ) > 0 ){
@@ -117,7 +121,7 @@ class NetworkSharedMenus {
 				
 			/** Main Site and Not Cached */
 			} elseif( ! get_option('network_shared_menu_'.$args->theme_location.'_cached') || strlen(trim(get_option('network_shared_menu_'.$args->theme_location.'_cached'))) == 0 ){
-				$this->log( 'Caching Menu network_shared_menu_'.$args->theme_location );
+				$this->log( 'Caching Menu ra_networ_menu_'.$args->theme_location );
 				update_option( 'network_shared_menu_'.$args->theme_location.'_cached', '1' );
 				update_site_option( 'network_shared_menu_'.$args->theme_location, $content );
 			}
@@ -126,10 +130,9 @@ class NetworkSharedMenus {
 		return $content;
     }
 
-    /** Whenever a nav item is saved, mark the menus for caching */
     public function nav_menu_flush( $post_id, $post ){
     	if( $post->post_type == 'nav_menu_item' ){
-			$this->network_menu_slots = apply_filters( 'network_shared_menus_theme_locations', $this->network_menu_slots );
+			$this->network_menu_slots = apply_filters( 'ra_wp_nav_menu_filter_slots', $this->network_menu_slots );
 			$this->log('Slots: '.print_r($network_menu_slots,true));
 			foreach( $this->network_menu_slots as $a_slot ){
 				update_option( 'network_shared_menu_'.$a_slot.'_cached', '' );	
@@ -137,12 +140,10 @@ class NetworkSharedMenus {
 		}
     }
 
-    /** Register a menu on the main site */
     public function create_admin_screen(){
 		add_theme_page( 'Network Menus', 'Network Menus', 'edit_themes', basename(__FILE__), array(&$this, 'admin_screen') );	
     }
 
-    /** Create the screen that allows main site admins to select the theme locations to cache/share */
     public function admin_screen(){
     	if( $_POST && $_POST['network_shared_menu_settings'] == 1 ){
 			$save_network_menus = array();
@@ -152,11 +153,11 @@ class NetworkSharedMenus {
 				}
 			}
 			update_site_option( 'network_shared_menus', $save_network_menus );
-			foreach( $save_network_menus as $a_slot ){
-				update_option( 'network_shared_menu_'.$a_slot.'_cached', '' );	
-			}	
+
+			update_site_option( 'network_shared_menus_type', $_POST['network_shared_menus_type'] );
 		}
 		$current_network_menus = get_site_option('network_shared_menus', array());
+		$current_integration_type = get_site_option( 'network_shared_menus_type', 'html' );
 		?>
 		<div class="wrap">
 			<h2>
@@ -175,13 +176,28 @@ class NetworkSharedMenus {
 					</li>
 					<?php endforeach; ?>
 				</ul>
+				<hr />
+				<p>Select the integration type.  Object integration will hook into the 'wp_nav_menu_objects' filter. HTML integration will hook later in the process, on the 'wp_nav_menu' filter.  Use HTML Integration for situations that require Ubermenu or other advanced menu editors.  Be aware that this has only been tested with Ubermenu static content items.
+				<ul>
+					<li>
+						<label for="network_shared_menus_type_object">
+							<input type="radio" name="network_shared_menus_type" value="object" id="network_shared_menus_type_object" <?php echo ($current_integration_type == 'object') ? 'checked="checked"' : ''; ?>/>
+							Object
+						</label>
+					</li>
+					<li>
+						<label for="network_shared_menus_type_html">
+							<input type="radio" name="network_shared_menus_type" value="html" id="network_shared_menus_type_html" <?php echo ($current_integration_type == 'html') ? 'checked="checked"' : ''; ?>/>
+							HTML
+						</label>
+					</li>
+				</ul>
 				<input class="button-primary" type="submit" name="Save" value="<?php _e("Save"); ?>" id="submitbutton" />
 			</form>
 		</div>
 		<?
     }
 
-    /** Hooks into the filter to specify the menu locations to share */
     public function fetch_menu_slots( $slots ){
     	$current_network_menus = get_site_option('network_shared_menus', array());
 		if( count($current_network_menus) > 0 ){
